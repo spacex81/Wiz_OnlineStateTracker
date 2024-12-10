@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"time"
 
@@ -187,20 +186,7 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	}
 }
 
-func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
-}
-
-func startHTTPServer() {
-	http.HandleFunc("/health", healthCheckHandler)
-	log.Println("HTTP health check is running on port 80")
-	log.Fatal(http.ListenAndServe(":80", nil))
-}
-
 func main() {
-	// go startHTTPServer()
-
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("Failed to listen on port 50051: %v", err)

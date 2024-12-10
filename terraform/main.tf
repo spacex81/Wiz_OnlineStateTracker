@@ -123,7 +123,7 @@ resource "aws_eip" "nat_eip" {
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat_eip.id
-  subnet_id     = aws_subnet.public["10.0.1.0/24"].id # Use one of the public subnets
+  subnet_id     = aws_subnet.public["10.0.1.0/24"].id 
 }
 
 # -------------------------------
@@ -187,8 +187,8 @@ resource "aws_security_group" "ecs_sg" {
   vpc_id = aws_vpc.main.id
 
   ingress {
-    from_port        = 50051  # Updated to 50051
-    to_port          = 50051  # Updated to 50051
+    from_port        = 50051  
+    to_port          = 50051  
     protocol         = "tcp"
     security_groups  = [aws_security_group.alb_sg.id]
   }
@@ -268,7 +268,6 @@ resource "aws_lb" "server_alb" {
   enable_deletion_protection = false
 }
 
-// TODO: Something will go wrong
 resource "aws_lb_target_group" "server" {
   name         = "server-target-group"
   port         = 50051
