@@ -201,6 +201,48 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
+resource "aws_security_group" "elasticache_sg" {
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    security_groups = [aws_security_group.ecs_sg.id] # Allow ECS to connect
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] 
+  }
+}
+
+# -------------------------------
+# ElastiCache Redis
+# -------------------------------
+resource "aws_elasticache_subnet_group" "redis_subnet_group" {
+  name       = "redis-subnet-group"
+  subnet_ids = [for subnet in aws_subnet.private : subnet.id]
+}
+
+resource "aws_elasticache_replication_group" "redis_cluster" {
+    // TODO: Improve this description and fix the error
+    description = "Elasticache"
+  replication_group_id          = "friend-tracker-redis"
+#   replication_group_description = "Friend Tracker Redis Replication Group"
+  engine                        = "redis"
+  engine_version                = "6.x"
+  node_type                     = "cache.t3.micro"
+#   number_cache_clusters         = 1
+  automatic_failover_enabled    = false
+  security_group_ids            = [aws_security_group.elasticache_sg.id]
+  subnet_group_name             = aws_elasticache_subnet_group.redis_subnet_group.name
+}
+
+
+
 # -------------------------------
 # ECS Fargate Resources
 # -------------------------------
@@ -219,7 +261,8 @@ resource "aws_ecs_task_definition" "server_task" {
 
   container_definitions = jsonencode([{
     name      = "friend-tracker"
-    image     = "spacex81359/friend-tracker2:latest"
+    # image     = "spacex81359/friend-tracker2:latest"
+    image     = "784319439312.dkr.ecr.ap-northeast-2.amazonaws.com/friend-tracker2:latest"
     essential = true
     portMappings = [{
       containerPort = 50051  # Updated to 50051
@@ -233,6 +276,12 @@ resource "aws_ecs_task_definition" "server_task" {
         awslogs-stream-prefix = "ecs"
       }
     }
+    environment = [
+      {
+        name  = "REDIS_ADDR"
+        value = "${aws_elasticache_replication_group.redis_cluster.primary_endpoint_address}:6379"
+      }
+    ]
   }])
 }
 
