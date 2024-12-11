@@ -12,13 +12,14 @@ variable "vpc_cidr" {
 
 variable "public_subnet_cidrs" {
   description = "List of CIDR blocks for the public subnets"
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.5.0/24", "10.0.6.0/24"]
 }
 
 variable "private_subnet_cidrs" {
   description = "List of CIDR blocks for the private subnets"
   default     = ["10.0.3.0/24", "10.0.4.0/24"]
 }
+
 
 variable "domain_name" {
   description = "The domain name (e.g., komaki.tech)"
@@ -85,15 +86,32 @@ resource "aws_vpc" "main" {
   }
 }
 
+# resource "aws_subnet" "public" {
+#   for_each = toset(var.public_subnet_cidrs)
+
+#   vpc_id            = aws_vpc.main.id
+#   cidr_block        = each.value
+#   map_public_ip_on_launch = true
+
+#   tags = {
+#     Name = "public-subnet-${each.value}"
+#   }
+# }
 resource "aws_subnet" "public" {
-  for_each = toset(var.public_subnet_cidrs)
+  for_each = {
+    "10.0.1.0/24" = "ap-northeast-2a"
+    "10.0.2.0/24" = "ap-northeast-2b"
+    "10.0.5.0/24" = "ap-northeast-2c"
+    "10.0.6.0/24" = "ap-northeast-2d"
+  }
 
   vpc_id            = aws_vpc.main.id
-  cidr_block        = each.value
+  cidr_block        = each.key
+  availability_zone = each.value
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "public-subnet-${each.value}"
+    Name = "public-subnet-${each.key}"
   }
 }
 
@@ -228,14 +246,11 @@ resource "aws_elasticache_subnet_group" "redis_subnet_group" {
 }
 
 resource "aws_elasticache_replication_group" "redis_cluster" {
-    // TODO: Improve this description and fix the error
-    description = "Elasticache"
+  description = "Elasticache"
   replication_group_id          = "friend-tracker-redis"
-#   replication_group_description = "Friend Tracker Redis Replication Group"
   engine                        = "redis"
   engine_version                = "6.x"
   node_type                     = "cache.t3.micro"
-#   number_cache_clusters         = 1
   automatic_failover_enabled    = false
   security_group_ids            = [aws_security_group.elasticache_sg.id]
   subnet_group_name             = aws_elasticache_subnet_group.redis_subnet_group.name
@@ -261,7 +276,6 @@ resource "aws_ecs_task_definition" "server_task" {
 
   container_definitions = jsonencode([{
     name      = "friend-tracker"
-    # image     = "spacex81359/friend-tracker2:latest"
     image     = "784319439312.dkr.ecr.ap-northeast-2.amazonaws.com/friend-tracker2:latest"
     essential = true
     portMappings = [{
@@ -314,18 +328,20 @@ resource "aws_lb" "server_alb" {
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = [for subnet in aws_subnet.public : subnet.id]
 
+
   enable_deletion_protection = false
 }
+
 
 resource "aws_lb_target_group" "server" {
   name         = "server-target-group"
   port         = 50051
-  protocol     = "HTTP"
+  protocol     = "HTTP" # Use HTTP instead of HTTP2
   vpc_id       = aws_vpc.main.id
   target_type  = "ip" 
 
   health_check {
-    path                = var.health_check_path
+    path                = "/"
     port                = "50051"
     interval            = 30
     timeout             = 5
