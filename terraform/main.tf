@@ -333,21 +333,38 @@ resource "aws_lb" "server_alb" {
 }
 
 
+# resource "aws_lb_target_group" "server" {
+#   name         = "server-target-group"
+#   port         = 50051
+#   protocol     = "HTTP" # Use HTTP instead of HTTP2
+#   vpc_id       = aws_vpc.main.id
+#   target_type  = "ip" 
+
+#   # health_check {
+#   #   path                = "/"
+#   #   port                = "50051"
+#   #   interval            = 30
+#   #   timeout             = 5
+#   #   healthy_threshold   = 2
+#   #   unhealthy_threshold = 2
+#   # }
+#   health_check {
+#     path                = "/health"  # Change this to /health
+#     port                = "8080"     # Change to 8080 if you expose a new port
+#   }
+
+#   tags = {
+#     Name = "server-target-group"
+#   }
+# }
 resource "aws_lb_target_group" "server" {
   name         = "server-target-group"
-  port         = 50051
-  protocol     = "HTTP" # Use HTTP instead of HTTP2
+  # port        = 80              
+  port        = 50051
+  protocol     = "HTTP"               
+  protocol_version = "GRPC"
   vpc_id       = aws_vpc.main.id
   target_type  = "ip" 
-
-  health_check {
-    path                = "/"
-    port                = "50051"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
 
   tags = {
     Name = "server-target-group"
