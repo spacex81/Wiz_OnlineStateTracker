@@ -86,17 +86,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-# resource "aws_subnet" "public" {
-#   for_each = toset(var.public_subnet_cidrs)
-
-#   vpc_id            = aws_vpc.main.id
-#   cidr_block        = each.value
-#   map_public_ip_on_launch = true
-
-#   tags = {
-#     Name = "public-subnet-${each.value}"
-#   }
-# }
 resource "aws_subnet" "public" {
   for_each = {
     "10.0.1.0/24" = "ap-northeast-2a"
@@ -333,30 +322,6 @@ resource "aws_lb" "server_alb" {
 }
 
 
-# resource "aws_lb_target_group" "server" {
-#   name         = "server-target-group"
-#   port         = 50051
-#   protocol     = "HTTP" # Use HTTP instead of HTTP2
-#   vpc_id       = aws_vpc.main.id
-#   target_type  = "ip" 
-
-#   # health_check {
-#   #   path                = "/"
-#   #   port                = "50051"
-#   #   interval            = 30
-#   #   timeout             = 5
-#   #   healthy_threshold   = 2
-#   #   unhealthy_threshold = 2
-#   # }
-#   health_check {
-#     path                = "/health"  # Change this to /health
-#     port                = "8080"     # Change to 8080 if you expose a new port
-#   }
-
-#   tags = {
-#     Name = "server-target-group"
-#   }
-# }
 resource "aws_lb_target_group" "server" {
   name         = "server-target-group"
   # port        = 80              
