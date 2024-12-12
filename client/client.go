@@ -11,6 +11,7 @@ import (
 	pb "example.com/service"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // TODO: Need a data structure to represent friend list and each online state
@@ -66,7 +67,24 @@ func main() {
 func runPingPongClient(clientID string) error {
 	log.Printf("Starting PingPong client for ClientID: %s", clientID)
 
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	// conn, err := grpc.Dial(
+	// 	"komaki.tech:443",
+	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
+	// 	grpc.WithDefaultCallOptions(
+	// 		grpc.MaxCallRecvMsgSize(16*1024*1024),
+	// 		grpc.MaxCallSendMsgSize(16*1024*1024),
+	// 	),
+	// )
+	conn, err := grpc.Dial(
+		"komaki.tech:443",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(16*1024*1024),
+			grpc.MaxCallSendMsgSize(16*1024*1024),
+		),
+	)
 	if err != nil {
 		return err
 	}
