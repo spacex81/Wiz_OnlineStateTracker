@@ -11,7 +11,7 @@ import (
 	pb "example.com/service"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 // TODO: Need a data structure to represent friend list and each online state
@@ -70,22 +70,17 @@ func runPingPongClient(clientID string) error {
 	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
 	// conn, err := grpc.Dial(
 	// 	"komaki.tech:443",
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
+	// 	grpc.WithTransportCredentials(credentials.NewTLS(nil)), // 👈 Secure TLS
+	// 	grpc.WithAuthority("komaki.tech"),                      // 👈 SNI for TLS
+	// 	grpc.WithBlock(),                                       // 👈 Block until connection is established
 	// 	grpc.WithDefaultCallOptions(
 	// 		grpc.MaxCallRecvMsgSize(16*1024*1024),
 	// 		grpc.MaxCallSendMsgSize(16*1024*1024),
 	// 	),
 	// )
-	conn, err := grpc.Dial(
-		"komaki.tech:443",
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(16*1024*1024),
-			grpc.MaxCallSendMsgSize(16*1024*1024),
-		),
-	)
+	conn, err := dialServer()
 	if err != nil {
+		log.Printf("Failed to connect to gRPC server: %v", err)
 		return err
 	}
 	defer conn.Close()
@@ -140,7 +135,18 @@ func runPingPongClient(clientID string) error {
 func runFriendListenerClient(clientID string, friends []string) error {
 	log.Printf("Starting Friend Listener client for ClientID: %s with friends: %v", clientID, friends)
 
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	// conn, err := grpc.Dial(
+	// 	"komaki.tech:443",
+	// 	grpc.WithTransportCredentials(credentials.NewTLS(nil)), // 👈 Secure TLS
+	// 	grpc.WithAuthority("komaki.tech"),                      // 👈 SNI for TLS
+	// 	grpc.WithBlock(),                                       // 👈 Block until connection is established
+	// 	grpc.WithDefaultCallOptions(
+	// 		grpc.MaxCallRecvMsgSize(16*1024*1024),
+	// 		grpc.MaxCallSendMsgSize(16*1024*1024),
+	// 	),
+	// )
+	conn, err := dialServer()
 	if err != nil {
 		return err
 	}
@@ -201,4 +207,25 @@ func printFriendStatusTable() {
 		return true // Continue iteration
 	})
 	fmt.Println("=================================")
+}
+
+// Shared function to dial the gRPC server
+func dialServer() (*grpc.ClientConn, error) {
+	log.Println("🔗 Dialing gRPC server at komaki.tech:443 ...")
+	conn, err := grpc.Dial(
+		"komaki.tech:443",
+		grpc.WithTransportCredentials(credentials.NewTLS(nil)), // 👈 Secure TLS
+		grpc.WithAuthority("komaki.tech"),                      // 👈 SNI for TLS
+		grpc.WithBlock(),                                       // 👈 Block until connection is established
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(16*1024*1024),
+			grpc.MaxCallSendMsgSize(16*1024*1024),
+		),
+	)
+	if err != nil {
+		log.Printf("❌ Failed to connect to gRPC server: %v", err)
+		return nil, err
+	}
+	log.Println("✅ Successfully connected to the gRPC server")
+	return conn, nil
 }

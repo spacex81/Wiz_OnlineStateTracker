@@ -10,6 +10,9 @@ service Server {
 
     // Handles friend listener for online status
     rpc FriendListener (stream FriendListenerMessage) returns (stream FriendStatusUpdate);
+
+    // New function to fetch all users from Redis
+    rpc GetAllUserInfo (Empty) returns (UserList);
 }
 
 message Ping {
@@ -49,5 +52,16 @@ message Pong {
     }
     Status status = 1;
 }
+
+/// Used for fetching all user infos from elastiCache
+message UserInfo {
+    string client_id = 1;
+    string status = 2;
+}
+
+message UserList {
+    repeated UserInfo users = 1;
+}
+///
 
 message Empty {}

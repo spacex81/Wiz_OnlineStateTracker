@@ -187,6 +187,49 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	}
 }
 
+func (s *Server) GetAllUserInfo(ctx context.Context, req *pb.Empty) (*pb.UserList, error) {
+	log.Println("Fetching all users from ElastiCache...")
+	var users []*pb.UserInfo
+
+	ctx = context.Background()
+	cursor := uint64(0)
+	scanCount := int64(100) // Number of keys to scan at a time
+	redisPrefix := "user:"
+
+	for {
+		// Scan keys with "user:" prefix
+		keys, nextCursor, err := s.redisClient.Scan(ctx, cursor, redisPrefix+"*", scanCount).Result()
+		if err != nil {
+			log.Printf("Failed to scan Redis keys: %v", err)
+			return nil, err
+		}
+
+		for _, key := range keys {
+			clientID := key[len(redisPrefix):] // Remove "user:" prefix
+			status, err := s.redisClient.Get(ctx, key).Result()
+			if err != nil {
+				log.Printf("Failed to get status for key %s: %v", key, err)
+				status = "unknown"
+			}
+
+			users = append(users, &pb.UserInfo{
+				ClientId: clientID,
+				Status:   status,
+			})
+		}
+
+		// If nextCursor is 0, we have scanned all keys
+		if nextCursor == 0 {
+			break
+		}
+
+		cursor = nextCursor
+	}
+
+	log.Printf("Found %d users in ElastiCache", len(users))
+	return &pb.UserList{Users: users}, nil
+}
+
 func main() {
 	//
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

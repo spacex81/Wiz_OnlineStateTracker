@@ -15,7 +15,8 @@ BUILD_CONTEXT=./server
 .PHONY: all build push clean
 
 # Default target (runs when you just type 'make')
-all: build login
+# all: build login
+all: login build
 
 # Build the Docker image
 build:
