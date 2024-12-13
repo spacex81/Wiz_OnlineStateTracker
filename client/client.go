@@ -68,16 +68,6 @@ func runPingPongClient(clientID string) error {
 	log.Printf("Starting PingPong client for ClientID: %s", clientID)
 
 	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
-	// conn, err := grpc.Dial(
-	// 	"komaki.tech:443",
-	// 	grpc.WithTransportCredentials(credentials.NewTLS(nil)), // 👈 Secure TLS
-	// 	grpc.WithAuthority("komaki.tech"),                      // 👈 SNI for TLS
-	// 	grpc.WithBlock(),                                       // 👈 Block until connection is established
-	// 	grpc.WithDefaultCallOptions(
-	// 		grpc.MaxCallRecvMsgSize(16*1024*1024),
-	// 		grpc.MaxCallSendMsgSize(16*1024*1024),
-	// 	),
-	// )
 	conn, err := dialServer()
 	if err != nil {
 		log.Printf("Failed to connect to gRPC server: %v", err)

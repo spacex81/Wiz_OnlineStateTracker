@@ -54,5 +54,5 @@ help:
 	@echo "  make clean   - Remove local images"
 
 generate:
-	protoc --go_out=./client --go-grpc_out=./client ./protos/*.proto
-	protoc --go_out=./server --go-grpc_out=./server ./protos/*.proto
+	protoc --go_out=./client --go-grpc_out=./client ./protocol/*.proto
+	protoc --go_out=./server --go-grpc_out=./server ./protocol/*.proto
