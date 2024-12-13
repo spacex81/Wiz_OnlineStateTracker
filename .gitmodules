@@ -1,0 +1,6 @@
+[submodule "protos/protocol"]
+	path = protos/protocol
+	url = git@github.com:spacex81/protocol.git
+[submodule "protocol"]
+	path = protocol
+	url = git@github.com:spacex81/protocol.git
