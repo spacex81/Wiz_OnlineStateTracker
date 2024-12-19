@@ -123,9 +123,8 @@ func runPingPongClient(clientID string) error {
 
 // runFriendListenerClient listens for friend status updates
 func runFriendListenerClient(clientID string, friends []string) error {
-	log.Printf("Starting Friend Listener client for ClientID: %s with friends: %v", clientID, friends)
+	log.Printf("🚀 Starting Friend Listener client for ClientID: %s with friends: %v", clientID, friends)
 
-	// conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
 	conn, err := dialServer()
 	if err != nil {
 		return err
@@ -136,30 +135,63 @@ func runFriendListenerClient(clientID string, friends []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Open the friend listener stream
 	stream, err := client.FriendListener(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Send the initial friend list
-	err = stream.Send(&pb.FriendListenerMessage{
-		FriendList: &pb.FriendList{FriendIds: friends},
+	// Send the initial friend list as a FriendListenerRequest
+	err = stream.Send(&pb.FriendListenerRequest{
+		Message: &pb.FriendListenerRequest_FriendList{
+			FriendList: &pb.FriendList{FriendIds: friends},
+		},
 	})
 	if err != nil {
+		log.Printf("❌ Failed to send FriendList: %v", err)
 		return err
 	}
+	log.Println("✅ Sent FriendList successfully")
 
-	// Goroutine to handle incoming friend status updates
+	// Goroutine to handle incoming FriendListenerResponse
 	go func() {
 		for {
-			statusUpdate, err := stream.Recv()
+			response, err := stream.Recv()
 			if err != nil {
-				log.Printf("Error receiving friend status update: %v", err)
+				log.Printf("❌ Error receiving FriendListenerResponse: %v", err)
 				cancel() // Cancel the context, forcing a reconnection
 				return
 			}
-			// log.Printf("Friend %s is now %v", statusUpdate.ClientId, statusUpdate.IsOnline)
-			updateFriendStatus(statusUpdate.ClientId, statusUpdate.IsOnline)
+
+			switch msg := response.Message.(type) {
+			// Handle friend update
+			case *pb.FriendListenerResponse_FriendUpdate:
+				friendUpdate := msg.FriendUpdate
+				log.Printf("📢 Friend update received - ID: %s, Status: %v", friendUpdate.ClientId, friendUpdate.IsOnline)
+				updateFriendStatus(friendUpdate.ClientId, friendUpdate.IsOnline)
+
+			// Handle keepalive ping
+			case *pb.FriendListenerResponse_KeepalivePing:
+				keepalivePing := msg.KeepalivePing
+				log.Printf("🔥 Received KeepAlivePing from server: %s", keepalivePing.Message)
+
+				// Send back the KeepAliveAck
+				err := stream.Send(&pb.FriendListenerRequest{
+					Message: &pb.FriendListenerRequest_KeepaliveAck{
+						KeepaliveAck: &pb.KeepAliveAck{
+							Message: "ACK from Go client",
+						},
+					},
+				})
+				if err != nil {
+					log.Printf("❌ Failed to send KeepAliveAck: %v", err)
+				} else {
+					log.Println("✅ Sent KeepAliveAck successfully")
+				}
+
+			default:
+				log.Printf("⚠️ Unknown message type received from server: %v", response)
+			}
 		}
 	}()
 

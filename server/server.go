@@ -147,28 +147,30 @@ func (s *Server) updateClientStatus(clientID string, isOnline bool) {
 func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	ctx := stream.Context()
 
-	// Start a goroutine to send periodic pings to the client
-	// ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
-	ticker := time.NewTicker(30 * time.Second)
+	// Start a goroutine to send periodic KeepAlivePing to the client
+	ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
 	defer ticker.Stop()
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("Context done, stopping periodic ping for client")
+				log.Println("Context done, stopping periodic KeepAlivePing for client")
 				return
 			case <-ticker.C:
-				// Send the periodic ping
-				err := stream.Send(&pb.FriendStatusUpdate{
-					ClientId: "server", // Special ID to denote it's a server ping
-					IsOnline: true,     // Can be true or false, it doesn't matter
+				// Send the KeepAlivePing
+				err := stream.Send(&pb.FriendListenerResponse{
+					Message: &pb.FriendListenerResponse_KeepalivePing{
+						KeepalivePing: &pb.KeepAlivePing{
+							Message: "KeepAlivePing from server",
+						},
+					},
 				})
 				if err != nil {
-					log.Printf("Failed to send periodic ping: %v", err)
+					log.Printf("❌ Failed to send KeepAlivePing: %v", err)
 					return
 				}
-				log.Println("✅ Sent periodic ping to client")
+				log.Println("✅ Sent KeepAlivePing to client")
 			}
 		}
 	}()
@@ -176,39 +178,67 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	for {
 		clientMsg, err := stream.Recv()
 		if err != nil {
-			log.Printf("Error receiving from client: %v", err)
+			log.Printf("❌ Error receiving from client: %v", err)
 			return err
 		}
 
-		if friendList := clientMsg.GetFriendList(); friendList != nil {
-			log.Printf("Received friend list: %v", friendList.FriendIds)
+		// Handle the oneof message from the client (either FriendList or KeepAliveAck)
+		switch msg := clientMsg.Message.(type) {
 
+		// Handle FriendList sent by the client
+		case *pb.FriendListenerRequest_FriendList:
+			friendList := msg.FriendList
+			log.Printf("📥 Received friend list: %v", friendList.FriendIds)
+
+			// Send the current online status of each friend to the client
 			for _, friendID := range friendList.FriendIds {
 				redisKey := "user:" + friendID
 				status, _ := s.redisClient.Get(ctx, redisKey).Result()
 				isOnline := (status == "online")
-				stream.Send(&pb.FriendStatusUpdate{
-					ClientId: friendID,
-					IsOnline: isOnline,
-				})
 
+				err := stream.Send(&pb.FriendListenerResponse{
+					Message: &pb.FriendListenerResponse_FriendUpdate{
+						FriendUpdate: &pb.FriendUpdate{
+							ClientId: friendID,
+							IsOnline: isOnline,
+						},
+					},
+				})
+				if err != nil {
+					log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
+				}
+
+				// Subscribe to changes for each friend in Redis
 				channel := fmt.Sprintf("status_updates:%s", friendID)
 				pubsub := s.redisClient.Subscribe(ctx, channel)
 
 				go func(friendID string) {
 					for msg := range pubsub.Channel() {
 						isOnline := msg.Payload == "true"
-						err := stream.Send(&pb.FriendStatusUpdate{
-							ClientId: friendID,
-							IsOnline: isOnline,
+						err := stream.Send(&pb.FriendListenerResponse{
+							Message: &pb.FriendListenerResponse_FriendUpdate{
+								FriendUpdate: &pb.FriendUpdate{
+									ClientId: friendID,
+									IsOnline: isOnline,
+								},
+							},
 						})
 						if err != nil {
-							log.Printf("Failed to send friend status update for %s: %v", friendID, err)
+							log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
 							return
 						}
+						log.Printf("✅ Sent friend status update for %s: %v", friendID, isOnline)
 					}
 				}(friendID)
 			}
+
+		// Handle KeepAliveAck sent by the client
+		case *pb.FriendListenerRequest_KeepaliveAck:
+			ack := msg.KeepaliveAck
+			log.Printf("📥 Received KeepAliveAck from client: %v", ack.Message)
+
+		default:
+			log.Printf("❌ Unknown message type received from client: %v", clientMsg)
 		}
 	}
 }

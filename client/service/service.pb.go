@@ -66,7 +66,7 @@ func (x Pong_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Pong_Status.Descriptor instead.
 func (Pong_Status) EnumDescriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{6, 0}
+	return file_protocol_service_proto_rawDescGZIP(), []int{9, 0}
 }
 
 type Ping struct {
@@ -194,28 +194,36 @@ func (*ClientMessage_ClientHello) isClientMessage_Message() {}
 func (*ClientMessage_Pong) isClientMessage_Message() {}
 
 // Used for the friend listener connection
-type FriendListenerMessage struct {
+//
+//	message FriendListenerMessage {
+//	    FriendList friend_list = 1;
+//	}
+type FriendListenerRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	FriendList *FriendList `protobuf:"bytes,1,opt,name=friend_list,json=friendList,proto3" json:"friend_list,omitempty"`
+	// Types that are assignable to Message:
+	//
+	//	*FriendListenerRequest_FriendList
+	//	*FriendListenerRequest_KeepaliveAck
+	Message isFriendListenerRequest_Message `protobuf_oneof:"message"`
 }
 
-func (x *FriendListenerMessage) Reset() {
-	*x = FriendListenerMessage{}
+func (x *FriendListenerRequest) Reset() {
+	*x = FriendListenerRequest{}
 	mi := &file_protocol_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FriendListenerMessage) String() string {
+func (x *FriendListenerRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FriendListenerMessage) ProtoMessage() {}
+func (*FriendListenerRequest) ProtoMessage() {}
 
-func (x *FriendListenerMessage) ProtoReflect() protoreflect.Message {
+func (x *FriendListenerRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -227,17 +235,47 @@ func (x *FriendListenerMessage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FriendListenerMessage.ProtoReflect.Descriptor instead.
-func (*FriendListenerMessage) Descriptor() ([]byte, []int) {
+// Deprecated: Use FriendListenerRequest.ProtoReflect.Descriptor instead.
+func (*FriendListenerRequest) Descriptor() ([]byte, []int) {
 	return file_protocol_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *FriendListenerMessage) GetFriendList() *FriendList {
-	if x != nil {
+func (m *FriendListenerRequest) GetMessage() isFriendListenerRequest_Message {
+	if m != nil {
+		return m.Message
+	}
+	return nil
+}
+
+func (x *FriendListenerRequest) GetFriendList() *FriendList {
+	if x, ok := x.GetMessage().(*FriendListenerRequest_FriendList); ok {
 		return x.FriendList
 	}
 	return nil
 }
+
+func (x *FriendListenerRequest) GetKeepaliveAck() *KeepAliveAck {
+	if x, ok := x.GetMessage().(*FriendListenerRequest_KeepaliveAck); ok {
+		return x.KeepaliveAck
+	}
+	return nil
+}
+
+type isFriendListenerRequest_Message interface {
+	isFriendListenerRequest_Message()
+}
+
+type FriendListenerRequest_FriendList struct {
+	FriendList *FriendList `protobuf:"bytes,1,opt,name=friend_list,json=friendList,proto3,oneof"` // Client sends friend list
+}
+
+type FriendListenerRequest_KeepaliveAck struct {
+	KeepaliveAck *KeepAliveAck `protobuf:"bytes,2,opt,name=keepalive_ack,json=keepaliveAck,proto3,oneof"` // Client acknowledges a keepalive ping
+}
+
+func (*FriendListenerRequest_FriendList) isFriendListenerRequest_Message() {}
+
+func (*FriendListenerRequest_KeepaliveAck) isFriendListenerRequest_Message() {}
 
 type FriendList struct {
 	state         protoimpl.MessageState
@@ -284,29 +322,32 @@ func (x *FriendList) GetFriendIds() []string {
 	return nil
 }
 
-type FriendStatusUpdate struct {
+type FriendListenerResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ClientId string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"` // The client whose state changed
-	IsOnline bool   `protobuf:"varint,2,opt,name=is_online,json=isOnline,proto3" json:"is_online,omitempty"`
+	// Types that are assignable to Message:
+	//
+	//	*FriendListenerResponse_FriendUpdate
+	//	*FriendListenerResponse_KeepalivePing
+	Message isFriendListenerResponse_Message `protobuf_oneof:"message"`
 }
 
-func (x *FriendStatusUpdate) Reset() {
-	*x = FriendStatusUpdate{}
+func (x *FriendListenerResponse) Reset() {
+	*x = FriendListenerResponse{}
 	mi := &file_protocol_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FriendStatusUpdate) String() string {
+func (x *FriendListenerResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FriendStatusUpdate) ProtoMessage() {}
+func (*FriendListenerResponse) ProtoMessage() {}
 
-func (x *FriendStatusUpdate) ProtoReflect() protoreflect.Message {
+func (x *FriendListenerResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_protocol_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -318,23 +359,193 @@ func (x *FriendStatusUpdate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FriendStatusUpdate.ProtoReflect.Descriptor instead.
-func (*FriendStatusUpdate) Descriptor() ([]byte, []int) {
+// Deprecated: Use FriendListenerResponse.ProtoReflect.Descriptor instead.
+func (*FriendListenerResponse) Descriptor() ([]byte, []int) {
 	return file_protocol_service_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *FriendStatusUpdate) GetClientId() string {
+func (m *FriendListenerResponse) GetMessage() isFriendListenerResponse_Message {
+	if m != nil {
+		return m.Message
+	}
+	return nil
+}
+
+func (x *FriendListenerResponse) GetFriendUpdate() *FriendUpdate {
+	if x, ok := x.GetMessage().(*FriendListenerResponse_FriendUpdate); ok {
+		return x.FriendUpdate
+	}
+	return nil
+}
+
+func (x *FriendListenerResponse) GetKeepalivePing() *KeepAlivePing {
+	if x, ok := x.GetMessage().(*FriendListenerResponse_KeepalivePing); ok {
+		return x.KeepalivePing
+	}
+	return nil
+}
+
+type isFriendListenerResponse_Message interface {
+	isFriendListenerResponse_Message()
+}
+
+type FriendListenerResponse_FriendUpdate struct {
+	FriendUpdate *FriendUpdate `protobuf:"bytes,1,opt,name=friend_update,json=friendUpdate,proto3,oneof"` // Used to update friend online status
+}
+
+type FriendListenerResponse_KeepalivePing struct {
+	KeepalivePing *KeepAlivePing `protobuf:"bytes,2,opt,name=keepalive_ping,json=keepalivePing,proto3,oneof"` // Server sends keepalive ping
+}
+
+func (*FriendListenerResponse_FriendUpdate) isFriendListenerResponse_Message() {}
+
+func (*FriendListenerResponse_KeepalivePing) isFriendListenerResponse_Message() {}
+
+//	message FriendStatusUpdate {
+//	    string client_id = 1; // The client whose state changed
+//	    bool is_online = 2;
+//	}
+type FriendUpdate struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ClientId string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`  // The client whose state changed
+	IsOnline bool   `protobuf:"varint,2,opt,name=is_online,json=isOnline,proto3" json:"is_online,omitempty"` // The online status of the client
+}
+
+func (x *FriendUpdate) Reset() {
+	*x = FriendUpdate{}
+	mi := &file_protocol_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FriendUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FriendUpdate) ProtoMessage() {}
+
+func (x *FriendUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FriendUpdate.ProtoReflect.Descriptor instead.
+func (*FriendUpdate) Descriptor() ([]byte, []int) {
+	return file_protocol_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *FriendUpdate) GetClientId() string {
 	if x != nil {
 		return x.ClientId
 	}
 	return ""
 }
 
-func (x *FriendStatusUpdate) GetIsOnline() bool {
+func (x *FriendUpdate) GetIsOnline() bool {
 	if x != nil {
 		return x.IsOnline
 	}
 	return false
+}
+
+type KeepAlivePing struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Message string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"` // Customizable message for debugging (e.g., "Ping from Server")
+}
+
+func (x *KeepAlivePing) Reset() {
+	*x = KeepAlivePing{}
+	mi := &file_protocol_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeepAlivePing) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeepAlivePing) ProtoMessage() {}
+
+func (x *KeepAlivePing) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeepAlivePing.ProtoReflect.Descriptor instead.
+func (*KeepAlivePing) Descriptor() ([]byte, []int) {
+	return file_protocol_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *KeepAlivePing) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type KeepAliveAck struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Message string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"` // Customizable message for debugging (e.g., "ACK from Client")
+}
+
+func (x *KeepAliveAck) Reset() {
+	*x = KeepAliveAck{}
+	mi := &file_protocol_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeepAliveAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeepAliveAck) ProtoMessage() {}
+
+func (x *KeepAliveAck) ProtoReflect() protoreflect.Message {
+	mi := &file_protocol_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeepAliveAck.ProtoReflect.Descriptor instead.
+func (*KeepAliveAck) Descriptor() ([]byte, []int) {
+	return file_protocol_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *KeepAliveAck) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 type ClientHello struct {
@@ -347,7 +558,7 @@ type ClientHello struct {
 
 func (x *ClientHello) Reset() {
 	*x = ClientHello{}
-	mi := &file_protocol_service_proto_msgTypes[5]
+	mi := &file_protocol_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +570,7 @@ func (x *ClientHello) String() string {
 func (*ClientHello) ProtoMessage() {}
 
 func (x *ClientHello) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_service_proto_msgTypes[5]
+	mi := &file_protocol_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +583,7 @@ func (x *ClientHello) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientHello.ProtoReflect.Descriptor instead.
 func (*ClientHello) Descriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{5}
+	return file_protocol_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ClientHello) GetClientId() string {
@@ -392,7 +603,7 @@ type Pong struct {
 
 func (x *Pong) Reset() {
 	*x = Pong{}
-	mi := &file_protocol_service_proto_msgTypes[6]
+	mi := &file_protocol_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -404,7 +615,7 @@ func (x *Pong) String() string {
 func (*Pong) ProtoMessage() {}
 
 func (x *Pong) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_service_proto_msgTypes[6]
+	mi := &file_protocol_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -417,7 +628,7 @@ func (x *Pong) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pong.ProtoReflect.Descriptor instead.
 func (*Pong) Descriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{6}
+	return file_protocol_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Pong) GetStatus() Pong_Status {
@@ -438,7 +649,7 @@ type UserInfo struct {
 
 func (x *UserInfo) Reset() {
 	*x = UserInfo{}
-	mi := &file_protocol_service_proto_msgTypes[7]
+	mi := &file_protocol_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +661,7 @@ func (x *UserInfo) String() string {
 func (*UserInfo) ProtoMessage() {}
 
 func (x *UserInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_service_proto_msgTypes[7]
+	mi := &file_protocol_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +674,7 @@ func (x *UserInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserInfo.ProtoReflect.Descriptor instead.
 func (*UserInfo) Descriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{7}
+	return file_protocol_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UserInfo) GetClientId() string {
@@ -490,7 +701,7 @@ type UserList struct {
 
 func (x *UserList) Reset() {
 	*x = UserList{}
-	mi := &file_protocol_service_proto_msgTypes[8]
+	mi := &file_protocol_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +713,7 @@ func (x *UserList) String() string {
 func (*UserList) ProtoMessage() {}
 
 func (x *UserList) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_service_proto_msgTypes[8]
+	mi := &file_protocol_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +726,7 @@ func (x *UserList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserList.ProtoReflect.Descriptor instead.
 func (*UserList) Descriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{8}
+	return file_protocol_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UserList) GetUsers() []*UserInfo {
@@ -533,7 +744,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_protocol_service_proto_msgTypes[9]
+	mi := &file_protocol_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +756,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_protocol_service_proto_msgTypes[9]
+	mi := &file_protocol_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +769,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_protocol_service_proto_rawDescGZIP(), []int{9}
+	return file_protocol_service_proto_rawDescGZIP(), []int{12}
 }
 
 var File_protocol_service_proto protoreflect.FileDescriptor
@@ -576,19 +787,39 @@ var file_protocol_service_proto_rawDesc = []byte{
 	0x23, 0x0a, 0x04, 0x70, 0x6f, 0x6e, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e,
 	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x50, 0x6f, 0x6e, 0x67, 0x48, 0x00, 0x52, 0x04,
 	0x70, 0x6f, 0x6e, 0x67, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22,
-	0x4d, 0x0a, 0x15, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e, 0x65,
-	0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x34, 0x0a, 0x0b, 0x66, 0x72, 0x69, 0x65,
-	0x6e, 0x64, 0x5f, 0x6c, 0x69, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x13, 0x2e,
-	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69,
-	0x73, 0x74, 0x52, 0x0a, 0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x22, 0x2b,
-	0x0a, 0x0a, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a,
-	0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09,
-	0x52, 0x09, 0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x49, 0x64, 0x73, 0x22, 0x4e, 0x0a, 0x12, 0x46,
-	0x72, 0x69, 0x65, 0x6e, 0x64, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x55, 0x70, 0x64, 0x61, 0x74,
-	0x65, 0x12, 0x1b, 0x0a, 0x09, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x12, 0x1b,
-	0x0a, 0x09, 0x69, 0x73, 0x5f, 0x6f, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x08, 0x52, 0x08, 0x69, 0x73, 0x4f, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x22, 0x2a, 0x0a, 0x0b, 0x43,
+	0x98, 0x01, 0x0a, 0x15, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e,
+	0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x36, 0x0a, 0x0b, 0x66, 0x72, 0x69,
+	0x65, 0x6e, 0x64, 0x5f, 0x6c, 0x69, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x13,
+	0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c,
+	0x69, 0x73, 0x74, 0x48, 0x00, 0x52, 0x0a, 0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73,
+	0x74, 0x12, 0x3c, 0x0a, 0x0d, 0x6b, 0x65, 0x65, 0x70, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x5f, 0x61,
+	0x63, 0x6b, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69,
+	0x63, 0x65, 0x2e, 0x4b, 0x65, 0x65, 0x70, 0x41, 0x6c, 0x69, 0x76, 0x65, 0x41, 0x63, 0x6b, 0x48,
+	0x00, 0x52, 0x0c, 0x6b, 0x65, 0x65, 0x70, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x41, 0x63, 0x6b, 0x42,
+	0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x2b, 0x0a, 0x0a, 0x46, 0x72,
+	0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x0a, 0x66, 0x72, 0x69, 0x65,
+	0x6e, 0x64, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x09, 0x52, 0x09, 0x66, 0x72,
+	0x69, 0x65, 0x6e, 0x64, 0x49, 0x64, 0x73, 0x22, 0xa2, 0x01, 0x0a, 0x16, 0x46, 0x72, 0x69, 0x65,
+	0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x3c, 0x0a, 0x0d, 0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x5f, 0x75, 0x70, 0x64,
+	0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x73, 0x65, 0x72, 0x76,
+	0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x48, 0x00, 0x52, 0x0c, 0x66, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x12, 0x3f, 0x0a, 0x0e, 0x6b, 0x65, 0x65, 0x70, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x5f, 0x70, 0x69,
+	0x6e, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69,
+	0x63, 0x65, 0x2e, 0x4b, 0x65, 0x65, 0x70, 0x41, 0x6c, 0x69, 0x76, 0x65, 0x50, 0x69, 0x6e, 0x67,
+	0x48, 0x00, 0x52, 0x0d, 0x6b, 0x65, 0x65, 0x70, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x50, 0x69, 0x6e,
+	0x67, 0x42, 0x09, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x48, 0x0a, 0x0c,
+	0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x12, 0x1b, 0x0a, 0x09,
+	0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x69, 0x73, 0x5f,
+	0x6f, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x08, 0x69, 0x73,
+	0x4f, 0x6e, 0x6c, 0x69, 0x6e, 0x65, 0x22, 0x29, 0x0a, 0x0d, 0x4b, 0x65, 0x65, 0x70, 0x41, 0x6c,
+	0x69, 0x76, 0x65, 0x50, 0x69, 0x6e, 0x67, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61,
+	0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x22, 0x28, 0x0a, 0x0c, 0x4b, 0x65, 0x65, 0x70, 0x41, 0x6c, 0x69, 0x76, 0x65, 0x41, 0x63,
+	0x6b, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x2a, 0x0a, 0x0b, 0x43,
 	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x12, 0x1b, 0x0a, 0x09, 0x63, 0x6c,
 	0x69, 0x65, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x63,
 	0x6c, 0x69, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x22, 0x73, 0x0a, 0x04, 0x50, 0x6f, 0x6e, 0x67, 0x12,
@@ -606,25 +837,25 @@ var file_protocol_service_proto_rawDesc = []byte{
 	0x08, 0x55, 0x73, 0x65, 0x72, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x27, 0x0a, 0x05, 0x75, 0x73, 0x65,
 	0x72, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69,
 	0x63, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x05, 0x75, 0x73, 0x65,
-	0x72, 0x73, 0x22, 0x07, 0x0a, 0x05, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x32, 0x84, 0x02, 0x0a, 0x06,
+	0x72, 0x73, 0x22, 0x07, 0x0a, 0x05, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x32, 0x88, 0x02, 0x0a, 0x06,
 	0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x12, 0x38, 0x0a, 0x0b, 0x43, 0x6f, 0x6d, 0x6d, 0x75, 0x6e,
 	0x69, 0x63, 0x61, 0x74, 0x65, 0x12, 0x16, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e,
 	0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x1a, 0x0d, 0x2e,
 	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x50, 0x69, 0x6e, 0x67, 0x28, 0x01, 0x30, 0x01,
-	0x12, 0x51, 0x0a, 0x0e, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e,
+	0x12, 0x55, 0x0a, 0x0e, 0x46, 0x72, 0x69, 0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e,
 	0x65, 0x72, 0x12, 0x1e, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69,
-	0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61,
-	0x67, 0x65, 0x1a, 0x1b, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69,
-	0x65, 0x6e, 0x64, 0x53, 0x74, 0x61, 0x74, 0x75, 0x73, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x28,
-	0x01, 0x30, 0x01, 0x12, 0x33, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x41, 0x6c, 0x6c, 0x55, 0x73, 0x65,
-	0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x0e, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e,
-	0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x11, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e,
-	0x55, 0x73, 0x65, 0x72, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x11, 0x53, 0x74, 0x72, 0x65,
-	0x61, 0x6d, 0x41, 0x6c, 0x6c, 0x55, 0x73, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x0e, 0x2e,
-	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x11, 0x2e,
-	0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x4c, 0x69, 0x73, 0x74,
-	0x30, 0x01, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x1f, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x46, 0x72, 0x69,
+	0x65, 0x6e, 0x64, 0x4c, 0x69, 0x73, 0x74, 0x65, 0x6e, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x28, 0x01, 0x30, 0x01, 0x12, 0x33, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x41, 0x6c,
+	0x6c, 0x55, 0x73, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x0e, 0x2e, 0x73, 0x65, 0x72, 0x76,
+	0x69, 0x63, 0x65, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x11, 0x2e, 0x73, 0x65, 0x72, 0x76,
+	0x69, 0x63, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x4c, 0x69, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x11,
+	0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x41, 0x6c, 0x6c, 0x55, 0x73, 0x65, 0x72, 0x49, 0x6e, 0x66,
+	0x6f, 0x12, 0x0e, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x45, 0x6d, 0x70, 0x74,
+	0x79, 0x1a, 0x11, 0x2e, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x2e, 0x55, 0x73, 0x65, 0x72,
+	0x4c, 0x69, 0x73, 0x74, 0x30, 0x01, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x73, 0x65, 0x72, 0x76,
+	0x69, 0x63, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -640,39 +871,45 @@ func file_protocol_service_proto_rawDescGZIP() []byte {
 }
 
 var file_protocol_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_protocol_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_protocol_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_protocol_service_proto_goTypes = []any{
-	(Pong_Status)(0),              // 0: service.Pong.Status
-	(*Ping)(nil),                  // 1: service.Ping
-	(*ClientMessage)(nil),         // 2: service.ClientMessage
-	(*FriendListenerMessage)(nil), // 3: service.FriendListenerMessage
-	(*FriendList)(nil),            // 4: service.FriendList
-	(*FriendStatusUpdate)(nil),    // 5: service.FriendStatusUpdate
-	(*ClientHello)(nil),           // 6: service.ClientHello
-	(*Pong)(nil),                  // 7: service.Pong
-	(*UserInfo)(nil),              // 8: service.UserInfo
-	(*UserList)(nil),              // 9: service.UserList
-	(*Empty)(nil),                 // 10: service.Empty
+	(Pong_Status)(0),               // 0: service.Pong.Status
+	(*Ping)(nil),                   // 1: service.Ping
+	(*ClientMessage)(nil),          // 2: service.ClientMessage
+	(*FriendListenerRequest)(nil),  // 3: service.FriendListenerRequest
+	(*FriendList)(nil),             // 4: service.FriendList
+	(*FriendListenerResponse)(nil), // 5: service.FriendListenerResponse
+	(*FriendUpdate)(nil),           // 6: service.FriendUpdate
+	(*KeepAlivePing)(nil),          // 7: service.KeepAlivePing
+	(*KeepAliveAck)(nil),           // 8: service.KeepAliveAck
+	(*ClientHello)(nil),            // 9: service.ClientHello
+	(*Pong)(nil),                   // 10: service.Pong
+	(*UserInfo)(nil),               // 11: service.UserInfo
+	(*UserList)(nil),               // 12: service.UserList
+	(*Empty)(nil),                  // 13: service.Empty
 }
 var file_protocol_service_proto_depIdxs = []int32{
-	6,  // 0: service.ClientMessage.client_hello:type_name -> service.ClientHello
-	7,  // 1: service.ClientMessage.pong:type_name -> service.Pong
-	4,  // 2: service.FriendListenerMessage.friend_list:type_name -> service.FriendList
-	0,  // 3: service.Pong.status:type_name -> service.Pong.Status
-	8,  // 4: service.UserList.users:type_name -> service.UserInfo
-	2,  // 5: service.Server.Communicate:input_type -> service.ClientMessage
-	3,  // 6: service.Server.FriendListener:input_type -> service.FriendListenerMessage
-	10, // 7: service.Server.GetAllUserInfo:input_type -> service.Empty
-	10, // 8: service.Server.StreamAllUserInfo:input_type -> service.Empty
-	1,  // 9: service.Server.Communicate:output_type -> service.Ping
-	5,  // 10: service.Server.FriendListener:output_type -> service.FriendStatusUpdate
-	9,  // 11: service.Server.GetAllUserInfo:output_type -> service.UserList
-	9,  // 12: service.Server.StreamAllUserInfo:output_type -> service.UserList
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	9,  // 0: service.ClientMessage.client_hello:type_name -> service.ClientHello
+	10, // 1: service.ClientMessage.pong:type_name -> service.Pong
+	4,  // 2: service.FriendListenerRequest.friend_list:type_name -> service.FriendList
+	8,  // 3: service.FriendListenerRequest.keepalive_ack:type_name -> service.KeepAliveAck
+	6,  // 4: service.FriendListenerResponse.friend_update:type_name -> service.FriendUpdate
+	7,  // 5: service.FriendListenerResponse.keepalive_ping:type_name -> service.KeepAlivePing
+	0,  // 6: service.Pong.status:type_name -> service.Pong.Status
+	11, // 7: service.UserList.users:type_name -> service.UserInfo
+	2,  // 8: service.Server.Communicate:input_type -> service.ClientMessage
+	3,  // 9: service.Server.FriendListener:input_type -> service.FriendListenerRequest
+	13, // 10: service.Server.GetAllUserInfo:input_type -> service.Empty
+	13, // 11: service.Server.StreamAllUserInfo:input_type -> service.Empty
+	1,  // 12: service.Server.Communicate:output_type -> service.Ping
+	5,  // 13: service.Server.FriendListener:output_type -> service.FriendListenerResponse
+	12, // 14: service.Server.GetAllUserInfo:output_type -> service.UserList
+	12, // 15: service.Server.StreamAllUserInfo:output_type -> service.UserList
+	12, // [12:16] is the sub-list for method output_type
+	8,  // [8:12] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_protocol_service_proto_init() }
@@ -684,13 +921,21 @@ func file_protocol_service_proto_init() {
 		(*ClientMessage_ClientHello)(nil),
 		(*ClientMessage_Pong)(nil),
 	}
+	file_protocol_service_proto_msgTypes[2].OneofWrappers = []any{
+		(*FriendListenerRequest_FriendList)(nil),
+		(*FriendListenerRequest_KeepaliveAck)(nil),
+	}
+	file_protocol_service_proto_msgTypes[4].OneofWrappers = []any{
+		(*FriendListenerResponse_FriendUpdate)(nil),
+		(*FriendListenerResponse_KeepalivePing)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_protocol_service_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

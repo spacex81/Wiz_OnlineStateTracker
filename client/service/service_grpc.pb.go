@@ -32,7 +32,8 @@ type ServerClient interface {
 	// Handles client ping/pong communication
 	Communicate(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientMessage, Ping], error)
 	// Handles friend listener for online status
-	FriendListener(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FriendListenerMessage, FriendStatusUpdate], error)
+	// rpc FriendListener (stream FriendListenerMessage) returns (stream FriendStatusUpdate);
+	FriendListener(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FriendListenerRequest, FriendListenerResponse], error)
 	// New function to fetch all users from Redis
 	GetAllUserInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*UserList, error)
 	// New streaming function to send real-time Redis user info list
@@ -60,18 +61,18 @@ func (c *serverClient) Communicate(ctx context.Context, opts ...grpc.CallOption)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Server_CommunicateClient = grpc.BidiStreamingClient[ClientMessage, Ping]
 
-func (c *serverClient) FriendListener(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FriendListenerMessage, FriendStatusUpdate], error) {
+func (c *serverClient) FriendListener(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FriendListenerRequest, FriendListenerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Server_ServiceDesc.Streams[1], Server_FriendListener_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[FriendListenerMessage, FriendStatusUpdate]{ClientStream: stream}
+	x := &grpc.GenericClientStream[FriendListenerRequest, FriendListenerResponse]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Server_FriendListenerClient = grpc.BidiStreamingClient[FriendListenerMessage, FriendStatusUpdate]
+type Server_FriendListenerClient = grpc.BidiStreamingClient[FriendListenerRequest, FriendListenerResponse]
 
 func (c *serverClient) GetAllUserInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*UserList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -109,7 +110,8 @@ type ServerServer interface {
 	// Handles client ping/pong communication
 	Communicate(grpc.BidiStreamingServer[ClientMessage, Ping]) error
 	// Handles friend listener for online status
-	FriendListener(grpc.BidiStreamingServer[FriendListenerMessage, FriendStatusUpdate]) error
+	// rpc FriendListener (stream FriendListenerMessage) returns (stream FriendStatusUpdate);
+	FriendListener(grpc.BidiStreamingServer[FriendListenerRequest, FriendListenerResponse]) error
 	// New function to fetch all users from Redis
 	GetAllUserInfo(context.Context, *Empty) (*UserList, error)
 	// New streaming function to send real-time Redis user info list
@@ -127,7 +129,7 @@ type UnimplementedServerServer struct{}
 func (UnimplementedServerServer) Communicate(grpc.BidiStreamingServer[ClientMessage, Ping]) error {
 	return status.Errorf(codes.Unimplemented, "method Communicate not implemented")
 }
-func (UnimplementedServerServer) FriendListener(grpc.BidiStreamingServer[FriendListenerMessage, FriendStatusUpdate]) error {
+func (UnimplementedServerServer) FriendListener(grpc.BidiStreamingServer[FriendListenerRequest, FriendListenerResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method FriendListener not implemented")
 }
 func (UnimplementedServerServer) GetAllUserInfo(context.Context, *Empty) (*UserList, error) {
@@ -165,11 +167,11 @@ func _Server_Communicate_Handler(srv interface{}, stream grpc.ServerStream) erro
 type Server_CommunicateServer = grpc.BidiStreamingServer[ClientMessage, Ping]
 
 func _Server_FriendListener_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ServerServer).FriendListener(&grpc.GenericServerStream[FriendListenerMessage, FriendStatusUpdate]{ServerStream: stream})
+	return srv.(ServerServer).FriendListener(&grpc.GenericServerStream[FriendListenerRequest, FriendListenerResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Server_FriendListenerServer = grpc.BidiStreamingServer[FriendListenerMessage, FriendStatusUpdate]
+type Server_FriendListenerServer = grpc.BidiStreamingServer[FriendListenerRequest, FriendListenerResponse]
 
 func _Server_GetAllUserInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
