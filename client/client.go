@@ -202,6 +202,11 @@ func dialServer() (*grpc.ClientConn, error) {
 			grpc.MaxCallSendMsgSize(16*1024*1024),
 		),
 	)
+	// grpc.WithKeepaliveParams(keepalive.ClientParameters{
+	// 	Time:    10 * time.Second,  // Send ping every 10 seconds if no activity
+	// 	Timeout: 20 * time.Second, // Wait 20 seconds for ping ack before resetting
+	// }),
+
 	if err != nil {
 		log.Printf("❌ Failed to connect to gRPC server: %v", err)
 		return nil, err

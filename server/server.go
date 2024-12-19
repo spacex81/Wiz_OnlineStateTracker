@@ -147,6 +147,32 @@ func (s *Server) updateClientStatus(clientID string, isOnline bool) {
 func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	ctx := stream.Context()
 
+	// Start a goroutine to send periodic pings to the client
+	// ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("Context done, stopping periodic ping for client")
+				return
+			case <-ticker.C:
+				// Send the periodic ping
+				err := stream.Send(&pb.FriendStatusUpdate{
+					ClientId: "server", // Special ID to denote it's a server ping
+					IsOnline: true,     // Can be true or false, it doesn't matter
+				})
+				if err != nil {
+					log.Printf("Failed to send periodic ping: %v", err)
+					return
+				}
+				log.Println("✅ Sent periodic ping to client")
+			}
+		}
+	}()
+
 	for {
 		clientMsg, err := stream.Recv()
 		if err != nil {
@@ -245,12 +271,13 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
+
 	server := NewServer()
 
 	pb.RegisterServerServer(grpcServer, server)
 	reflection.Register(grpcServer)
 
-	log.Printf("Server is running on port 50051")
+	log.Printf("Server is running on port 50051: 30secs ping added")
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

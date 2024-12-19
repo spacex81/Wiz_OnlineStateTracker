@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Server_Communicate_FullMethodName    = "/service.Server/Communicate"
-	Server_FriendListener_FullMethodName = "/service.Server/FriendListener"
-	Server_GetAllUserInfo_FullMethodName = "/service.Server/GetAllUserInfo"
+	Server_Communicate_FullMethodName       = "/service.Server/Communicate"
+	Server_FriendListener_FullMethodName    = "/service.Server/FriendListener"
+	Server_GetAllUserInfo_FullMethodName    = "/service.Server/GetAllUserInfo"
+	Server_StreamAllUserInfo_FullMethodName = "/service.Server/StreamAllUserInfo"
 )
 
 // ServerClient is the client API for Server service.
@@ -34,6 +35,8 @@ type ServerClient interface {
 	FriendListener(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FriendListenerMessage, FriendStatusUpdate], error)
 	// New function to fetch all users from Redis
 	GetAllUserInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*UserList, error)
+	// New streaming function to send real-time Redis user info list
+	StreamAllUserInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[UserList], error)
 }
 
 type serverClient struct {
@@ -80,6 +83,25 @@ func (c *serverClient) GetAllUserInfo(ctx context.Context, in *Empty, opts ...gr
 	return out, nil
 }
 
+func (c *serverClient) StreamAllUserInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[UserList], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Server_ServiceDesc.Streams[2], Server_StreamAllUserInfo_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[Empty, UserList]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Server_StreamAllUserInfoClient = grpc.ServerStreamingClient[UserList]
+
 // ServerServer is the server API for Server service.
 // All implementations must embed UnimplementedServerServer
 // for forward compatibility.
@@ -90,6 +112,8 @@ type ServerServer interface {
 	FriendListener(grpc.BidiStreamingServer[FriendListenerMessage, FriendStatusUpdate]) error
 	// New function to fetch all users from Redis
 	GetAllUserInfo(context.Context, *Empty) (*UserList, error)
+	// New streaming function to send real-time Redis user info list
+	StreamAllUserInfo(*Empty, grpc.ServerStreamingServer[UserList]) error
 	mustEmbedUnimplementedServerServer()
 }
 
@@ -108,6 +132,9 @@ func (UnimplementedServerServer) FriendListener(grpc.BidiStreamingServer[FriendL
 }
 func (UnimplementedServerServer) GetAllUserInfo(context.Context, *Empty) (*UserList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllUserInfo not implemented")
+}
+func (UnimplementedServerServer) StreamAllUserInfo(*Empty, grpc.ServerStreamingServer[UserList]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamAllUserInfo not implemented")
 }
 func (UnimplementedServerServer) mustEmbedUnimplementedServerServer() {}
 func (UnimplementedServerServer) testEmbeddedByValue()                {}
@@ -162,6 +189,17 @@ func _Server_GetAllUserInfo_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Server_StreamAllUserInfo_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ServerServer).StreamAllUserInfo(m, &grpc.GenericServerStream[Empty, UserList]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Server_StreamAllUserInfoServer = grpc.ServerStreamingServer[UserList]
+
 // Server_ServiceDesc is the grpc.ServiceDesc for Server service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -186,6 +224,11 @@ var Server_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _Server_FriendListener_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "StreamAllUserInfo",
+			Handler:       _Server_StreamAllUserInfo_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "protocol/service.proto",
