@@ -172,8 +172,8 @@ func runFriendListenerClient(clientID string, friends []string) error {
 
 			// Handle keepalive ping
 			case *pb.FriendListenerResponse_KeepalivePing:
-				keepalivePing := msg.KeepalivePing
-				log.Printf("🔥 Received KeepAlivePing from server: %s", keepalivePing.Message)
+				// keepalivePing := msg.KeepalivePing
+				// log.Printf("🔥 Received KeepAlivePing from server: %s", keepalivePing.Message)
 
 				// Send back the KeepAliveAck
 				err := stream.Send(&pb.FriendListenerRequest{
@@ -186,7 +186,7 @@ func runFriendListenerClient(clientID string, friends []string) error {
 				if err != nil {
 					log.Printf("❌ Failed to send KeepAliveAck: %v", err)
 				} else {
-					log.Println("✅ Sent KeepAliveAck successfully")
+					// log.Println("✅ Sent KeepAliveAck successfully")
 				}
 
 			default:
