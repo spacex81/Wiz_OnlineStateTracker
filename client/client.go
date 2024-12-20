@@ -106,7 +106,7 @@ func runPingPongClient(clientID string) error {
 
 			err = stream.Send(&pb.ClientMessage{
 				Message: &pb.ClientMessage_Pong{
-					Pong: &pb.Pong{Status: pb.Pong_STATUS_EVEN},
+					Pong: &pb.Pong{Status: pb.Pong_FOREGROUND}, // Example: Always return FOREGROUND for now
 				},
 			})
 			if err != nil {
@@ -167,8 +167,8 @@ func runFriendListenerClient(clientID string, friends []string) error {
 			// Handle friend update
 			case *pb.FriendListenerResponse_FriendUpdate:
 				friendUpdate := msg.FriendUpdate
-				log.Printf("📢 Friend update received - ID: %s, Status: %v", friendUpdate.ClientId, friendUpdate.IsOnline)
-				updateFriendStatus(friendUpdate.ClientId, friendUpdate.IsOnline)
+				log.Printf("📢 Friend update - ID: %s, Status: %v", friendUpdate.ClientId, friendUpdate.Status.String())
+				updateFriendStatus(friendUpdate.ClientId, friendUpdate.Status)
 
 			// Handle keepalive ping
 			case *pb.FriendListenerResponse_KeepalivePing:
@@ -199,10 +199,21 @@ func runFriendListenerClient(clientID string, friends []string) error {
 	return ctx.Err()
 }
 
-func updateFriendStatus(friendID string, isOnline bool) {
-	// Update the friend status in the sync.Map
-	friendStatusMap.Store(friendID, isOnline)
-	log.Printf("Updated friend %s to %v", friendID, isOnline)
+func updateFriendStatus(friendID string, status pb.FriendUpdate_Status) {
+	var statusString string
+	switch status {
+	case pb.FriendUpdate_FOREGROUND:
+		statusString = "FOREGROUND"
+	case pb.FriendUpdate_BACKGROUND:
+		statusString = "BACKGROUND"
+	case pb.FriendUpdate_OFFLINE:
+		statusString = "OFFLINE"
+	default:
+		statusString = "UNKNOWN"
+	}
+
+	friendStatusMap.Store(friendID, statusString)
+	log.Printf("Updated friend %s to %s", friendID, statusString)
 	printFriendStatusTable()
 }
 
@@ -210,13 +221,9 @@ func printFriendStatusTable() {
 	fmt.Println("====== Friend Status Table ======")
 	friendStatusMap.Range(func(key, value interface{}) bool {
 		clientID := key.(string)
-		isOnline := value.(bool)
-		status := "OFFLINE"
-		if isOnline {
-			status = "ONLINE"
-		}
+		status := value.(string)
 		fmt.Printf("Friend ID: %s | Status: %s\n", clientID, status)
-		return true // Continue iteration
+		return true
 	})
 	fmt.Println("=================================")
 }
