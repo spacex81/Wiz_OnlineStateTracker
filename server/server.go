@@ -153,51 +153,164 @@ func (s *Server) startPingingClient(clientID string, stream pb.Server_Communicat
 //			log.Printf("Published status update for client %s: %v", clientID, payload)
 //		}
 //	}
-func (s *Server) updateClientStatus(clientID string, status string) {
+func (s *Server) updateClientStatus(clientID string, newStatus string) {
 	redisKey := "user:" + clientID
 	ctx := context.Background()
+	statusChanged := false // Flag to track if status actually changed
 
-	// Check if the current status is already set in Redis
+	// Check the current status from Redis
 	currentStatus, err := s.redisClient.Get(ctx, redisKey).Result()
 	if err != nil && err != redis.Nil {
 		log.Printf("Error checking Redis for client %s: %v", clientID, err)
 		return
 	}
 
-	if status == "offline" {
-		// If the client status is offline, remove the key from Redis
+	// Handle the "offline" status case
+	if newStatus == "offline" {
 		if currentStatus != "" {
+			// Client is currently online, remove it from Redis
 			err := s.redisClient.Del(ctx, redisKey).Err()
 			if err != nil {
 				log.Printf("Failed to remove status for client %s: %v", clientID, err)
 			} else {
-				log.Printf("Set client %s to OFFLINE", clientID)
+				log.Printf("Client %s set to OFFLINE", clientID)
+				statusChanged = true
 			}
 		} else {
 			log.Printf("Client %s is already OFFLINE", clientID)
 		}
 	} else {
-		// If the status is foreground or background, update Redis only if the status has changed
-		if currentStatus != status {
-			// Update the status and extend TTL
-			err := s.redisClient.Set(ctx, redisKey, status, 5*time.Second).Err()
+		// Handle "foreground" or "background" statuses
+		if currentStatus != newStatus {
+			// Status has changed, update Redis with new status
+			err := s.redisClient.Set(ctx, redisKey, newStatus, 5*time.Second).Err()
 			if err != nil {
-				log.Printf("Failed to set %s status for client %s: %v", status, clientID, err)
+				log.Printf("Failed to set %s status for client %s: %v", newStatus, clientID, err)
 			} else {
-				log.Printf("Updated client %s to %s", clientID, status)
+				log.Printf("Updated client %s to %s", clientID, newStatus)
+				statusChanged = true
 			}
 		} else {
-			// No change in status, but we extend the TTL
+			// No status change, but extend the TTL
 			err := s.redisClient.Expire(ctx, redisKey, 5*time.Second).Err()
 			if err != nil {
 				log.Printf("Failed to extend TTL for client %s: %v", clientID, err)
 			} else {
-				log.Printf("Extended TTL for client %s (status: %s)", clientID, status)
+				log.Printf("Extended TTL for client %s (status: %s)", clientID, newStatus)
 			}
+		}
+	}
+
+	// If the status changed, publish the change
+	if statusChanged {
+		channel := fmt.Sprintf("status_updates:%s", clientID)
+		err := s.redisClient.Publish(ctx, channel, newStatus).Err()
+		if err != nil {
+			log.Printf("Failed to publish status change for client %s: %v", clientID, err)
+		} else {
+			log.Printf("Published status change for client %s: %s", clientID, newStatus)
 		}
 	}
 }
 
+// func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
+// 	ctx := stream.Context()
+
+// 	// Start a goroutine to send periodic KeepAlivePing to the client
+// 	ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
+// 	defer ticker.Stop()
+
+// 	go func() {
+// 		for {
+// 			select {
+// 			case <-ctx.Done():
+// 				log.Println("Context done, stopping periodic KeepAlivePing for client")
+// 				return
+// 			case <-ticker.C:
+// 				// Send the KeepAlivePing
+// 				err := stream.Send(&pb.FriendListenerResponse{
+// 					Message: &pb.FriendListenerResponse_KeepalivePing{
+// 						KeepalivePing: &pb.KeepAlivePing{
+// 							Message: "KeepAlivePing from server",
+// 						},
+// 					},
+// 				})
+// 				if err != nil {
+// 					log.Printf("❌ Failed to send KeepAlivePing: %v", err)
+// 					return
+// 				}
+// 				log.Println("✅ Sent KeepAlivePing to client")
+// 			}
+// 		}
+// 	}()
+
+// 	for {
+// 		clientMsg, err := stream.Recv()
+// 		if err != nil {
+// 			log.Printf("❌ Error receiving from client: %v", err)
+// 			return err
+// 		}
+
+// 		// Handle the oneof message from the client (either FriendList or KeepAliveAck)
+// 		switch msg := clientMsg.Message.(type) {
+
+// 		// Handle FriendList sent by the client
+// 		case *pb.FriendListenerRequest_FriendList:
+// 			friendList := msg.FriendList
+// 			log.Printf("📥 Received friend list: %v", friendList.FriendIds)
+
+// 			// Send the current online status of each friend to the client
+// 			for _, friendID := range friendList.FriendIds {
+// 				redisKey := "user:" + friendID
+// 				status, _ := s.redisClient.Get(ctx, redisKey).Result()
+// 				isOnline := (status == "online")
+
+// 				err := stream.Send(&pb.FriendListenerResponse{
+// 					Message: &pb.FriendListenerResponse_FriendUpdate{
+// 						FriendUpdate: &pb.FriendUpdate{
+// 							ClientId: friendID,
+// 							IsOnline: isOnline,
+// 						},
+// 					},
+// 				})
+// 				if err != nil {
+// 					log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
+// 				}
+
+// 				// Subscribe to changes for each friend in Redis
+// 				channel := fmt.Sprintf("status_updates:%s", friendID)
+// 				pubsub := s.redisClient.Subscribe(ctx, channel)
+
+// 				go func(friendID string) {
+// 					for msg := range pubsub.Channel() {
+// 						isOnline := msg.Payload == "true"
+// 						err := stream.Send(&pb.FriendListenerResponse{
+// 							Message: &pb.FriendListenerResponse_FriendUpdate{
+// 								FriendUpdate: &pb.FriendUpdate{
+// 									ClientId: friendID,
+// 									IsOnline: isOnline,
+// 								},
+// 							},
+// 						})
+// 						if err != nil {
+// 							log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
+// 							return
+// 						}
+// 						log.Printf("✅ Sent friend status update for %s: %v", friendID, isOnline)
+// 					}
+// 				}(friendID)
+// 			}
+
+// 		// Handle KeepAliveAck sent by the client
+// 		case *pb.FriendListenerRequest_KeepaliveAck:
+// 			ack := msg.KeepaliveAck
+// 			log.Printf("📥 Received KeepAliveAck from client: %v", ack.Message)
+
+//			default:
+//				log.Printf("❌ Unknown message type received from client: %v", clientMsg)
+//			}
+//		}
+//	}
 func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	ctx := stream.Context()
 
@@ -221,10 +334,10 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 					},
 				})
 				if err != nil {
-					log.Printf("❌ Failed to send KeepAlivePing: %v", err)
+					log.Printf("Failed to send KeepAlivePing: %v", err)
 					return
 				}
-				log.Println("✅ Sent KeepAlivePing to client")
+				log.Println("Sent KeepAlivePing to client")
 			}
 		}
 	}()
@@ -232,34 +345,33 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	for {
 		clientMsg, err := stream.Recv()
 		if err != nil {
-			log.Printf("❌ Error receiving from client: %v", err)
+			log.Printf("Error receiving from client: %v", err)
 			return err
 		}
 
 		// Handle the oneof message from the client (either FriendList or KeepAliveAck)
 		switch msg := clientMsg.Message.(type) {
 
-		// Handle FriendList sent by the client
 		case *pb.FriendListenerRequest_FriendList:
 			friendList := msg.FriendList
-			log.Printf("📥 Received friend list: %v", friendList.FriendIds)
+			log.Printf("Received friend list: %v", friendList.FriendIds)
 
-			// Send the current online status of each friend to the client
+			// Send the current status of each friend to the client
 			for _, friendID := range friendList.FriendIds {
 				redisKey := "user:" + friendID
 				status, _ := s.redisClient.Get(ctx, redisKey).Result()
-				isOnline := (status == "online")
+				statusEnum := s.mapStatusToEnum(status)
 
 				err := stream.Send(&pb.FriendListenerResponse{
 					Message: &pb.FriendListenerResponse_FriendUpdate{
 						FriendUpdate: &pb.FriendUpdate{
 							ClientId: friendID,
-							IsOnline: isOnline,
+							Status:   statusEnum,
 						},
 					},
 				})
 				if err != nil {
-					log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
+					log.Printf("Failed to send friend status update for %s: %v", friendID, err)
 				}
 
 				// Subscribe to changes for each friend in Redis
@@ -268,32 +380,45 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 
 				go func(friendID string) {
 					for msg := range pubsub.Channel() {
-						isOnline := msg.Payload == "true"
+						statusEnum := s.mapStatusToEnum(msg.Payload)
 						err := stream.Send(&pb.FriendListenerResponse{
 							Message: &pb.FriendListenerResponse_FriendUpdate{
 								FriendUpdate: &pb.FriendUpdate{
 									ClientId: friendID,
-									IsOnline: isOnline,
+									Status:   statusEnum,
 								},
 							},
 						})
 						if err != nil {
-							log.Printf("❌ Failed to send friend status update for %s: %v", friendID, err)
+							log.Printf("Failed to send friend status update for %s: %v", friendID, err)
 							return
 						}
-						log.Printf("✅ Sent friend status update for %s: %v", friendID, isOnline)
+						log.Printf("Sent friend status update for %s: %v", friendID, statusEnum)
 					}
 				}(friendID)
 			}
 
-		// Handle KeepAliveAck sent by the client
 		case *pb.FriendListenerRequest_KeepaliveAck:
 			ack := msg.KeepaliveAck
-			log.Printf("📥 Received KeepAliveAck from client: %v", ack.Message)
+			log.Printf("Received KeepAliveAck from client: %v", ack.Message)
 
 		default:
-			log.Printf("❌ Unknown message type received from client: %v", clientMsg)
+			log.Printf("Unknown message type received from client: %v", clientMsg)
 		}
+	}
+}
+
+func (s *Server) mapStatusToEnum(status string) pb.FriendUpdate_Status {
+	switch status {
+	case "foreground":
+		return pb.FriendUpdate_FOREGROUND
+	case "background":
+		return pb.FriendUpdate_BACKGROUND
+	case "offline":
+		return pb.FriendUpdate_OFFLINE
+	default:
+		log.Printf("Unknown status '%s' received, defaulting to OFFLINE", status)
+		return pb.FriendUpdate_OFFLINE
 	}
 }
 
