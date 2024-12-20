@@ -61,7 +61,8 @@ func (s *Server) Communicate(stream pb.Server_CommunicateServer) error {
 
 	defer func() {
 		log.Printf("Client disconnected: %s", clientID)
-		s.updateClientStatus(clientID, false)
+		// s.updateClientStatus(clientID, false)
+		s.updateClientStatus(clientID, "offline")
 	}()
 
 	go s.startPingingClient(clientID, stream)
@@ -75,8 +76,17 @@ func (s *Server) Communicate(stream pb.Server_CommunicateServer) error {
 		}
 
 		if pong := clientMsg.GetPong(); pong != nil {
-			log.Printf("Received Pong with status: %s from clientID: %s", pong.Status.String(), clientID)
-			s.updateClientStatus(clientID, true)
+			// Check if the pong status includes whether the app is in foreground or background
+			switch pong.Status {
+			case pb.Pong_FOREGROUND:
+				log.Printf("Received Pong with status: FOREGROUND from clientID: %s", clientID)
+				s.updateClientStatus(clientID, "foreground")
+			case pb.Pong_BACKGROUND:
+				log.Printf("Received Pong with status: BACKGROUND from clientID: %s", clientID)
+				s.updateClientStatus(clientID, "background")
+			default:
+				log.Printf("Received Pong with unknown status from clientID: %s", clientID)
+			}
 		} else {
 			log.Println("Received unknown message type from client.")
 		}
@@ -95,52 +105,96 @@ func (s *Server) startPingingClient(clientID string, stream pb.Server_Communicat
 	}
 }
 
-func (s *Server) updateClientStatus(clientID string, isOnline bool) {
+// func (s *Server) updateClientStatus(clientID string, isOnline bool) {
+// 	redisKey := "user:" + clientID
+// 	ctx := context.Background()
+
+// 	exists, err := s.redisClient.Exists(ctx, redisKey).Result()
+// 	if err != nil {
+// 		log.Printf("Failed to check Redis for client %s: %v", clientID, err)
+// 		return
+// 	}
+
+// 	statusChanged := false
+
+// 	if isOnline {
+// 		if exists > 0 {
+// 			err = s.redisClient.Expire(ctx, redisKey, 5*time.Second).Err()
+// 			if err != nil {
+// 				log.Printf("Failed to refresh TTL for client %s: %v", clientID, err)
+// 			}
+// 		} else {
+// 			err = s.redisClient.Set(ctx, redisKey, "online", 5*time.Second).Err()
+// 			if err != nil {
+// 				log.Printf("Failed to set online status for client %s: %v", clientID, err)
+// 			}
+// 			statusChanged = true
+// 		}
+// 	} else {
+// 		if exists > 0 {
+// 			err = s.redisClient.Del(ctx, redisKey).Err()
+// 			if err != nil {
+// 				log.Printf("Failed to remove status for client %s: %v", clientID, err)
+// 			}
+// 			statusChanged = true
+// 		}
+// 	}
+
+//		if statusChanged {
+//			channel := fmt.Sprintf("status_updates:%s", clientID)
+//			payload := "false"
+//			if isOnline {
+//				payload = "true"
+//			}
+//			err = s.redisClient.Publish(ctx, channel, payload).Err()
+//			if err != nil {
+//				log.Printf("Failed to publish status update for client %s: %v", clientID, err)
+//			}
+//			log.Printf("Published status update for client %s: %v", clientID, payload)
+//		}
+//	}
+func (s *Server) updateClientStatus(clientID string, status string) {
 	redisKey := "user:" + clientID
 	ctx := context.Background()
 
-	exists, err := s.redisClient.Exists(ctx, redisKey).Result()
-	if err != nil {
-		log.Printf("Failed to check Redis for client %s: %v", clientID, err)
+	// Check if the current status is already set in Redis
+	currentStatus, err := s.redisClient.Get(ctx, redisKey).Result()
+	if err != nil && err != redis.Nil {
+		log.Printf("Error checking Redis for client %s: %v", clientID, err)
 		return
 	}
 
-	statusChanged := false
-
-	if isOnline {
-		if exists > 0 {
-			err = s.redisClient.Expire(ctx, redisKey, 5*time.Second).Err()
-			if err != nil {
-				log.Printf("Failed to refresh TTL for client %s: %v", clientID, err)
-			}
-		} else {
-			err = s.redisClient.Set(ctx, redisKey, "online", 5*time.Second).Err()
-			if err != nil {
-				log.Printf("Failed to set online status for client %s: %v", clientID, err)
-			}
-			statusChanged = true
-		}
-	} else {
-		if exists > 0 {
-			err = s.redisClient.Del(ctx, redisKey).Err()
+	if status == "offline" {
+		// If the client status is offline, remove the key from Redis
+		if currentStatus != "" {
+			err := s.redisClient.Del(ctx, redisKey).Err()
 			if err != nil {
 				log.Printf("Failed to remove status for client %s: %v", clientID, err)
+			} else {
+				log.Printf("Set client %s to OFFLINE", clientID)
 			}
-			statusChanged = true
+		} else {
+			log.Printf("Client %s is already OFFLINE", clientID)
 		}
-	}
-
-	if statusChanged {
-		channel := fmt.Sprintf("status_updates:%s", clientID)
-		payload := "false"
-		if isOnline {
-			payload = "true"
+	} else {
+		// If the status is foreground or background, update Redis only if the status has changed
+		if currentStatus != status {
+			// Update the status and extend TTL
+			err := s.redisClient.Set(ctx, redisKey, status, 5*time.Second).Err()
+			if err != nil {
+				log.Printf("Failed to set %s status for client %s: %v", status, clientID, err)
+			} else {
+				log.Printf("Updated client %s to %s", clientID, status)
+			}
+		} else {
+			// No change in status, but we extend the TTL
+			err := s.redisClient.Expire(ctx, redisKey, 5*time.Second).Err()
+			if err != nil {
+				log.Printf("Failed to extend TTL for client %s: %v", clientID, err)
+			} else {
+				log.Printf("Extended TTL for client %s (status: %s)", clientID, status)
+			}
 		}
-		err = s.redisClient.Publish(ctx, channel, payload).Err()
-		if err != nil {
-			log.Printf("Failed to publish status update for client %s: %v", clientID, err)
-		}
-		log.Printf("Published status update for client %s: %v", clientID, payload)
 	}
 }
 
@@ -307,7 +361,7 @@ func main() {
 	pb.RegisterServerServer(grpcServer, server)
 	reflection.Register(grpcServer)
 
-	log.Printf("Server is running on port 50051: 30secs ping added")
+	log.Printf("Server is running on port 50051: Upgrade Pong Structure")
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
