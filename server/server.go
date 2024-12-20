@@ -165,8 +165,108 @@ func (s *Server) updateClientStatus(clientID string, newStatus string) {
 	}
 }
 
+// func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
+// 	ctx := stream.Context()
+
+// 	// Start a goroutine to send periodic KeepAlivePing to the client
+// 	ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
+// 	defer ticker.Stop()
+
+// 	go func() {
+// 		for {
+// 			select {
+// 			case <-ctx.Done():
+// 				log.Println("Context done, stopping periodic KeepAlivePing for client")
+// 				return
+// 			case <-ticker.C:
+// 				// Send the KeepAlivePing
+// 				err := stream.Send(&pb.FriendListenerResponse{
+// 					Message: &pb.FriendListenerResponse_KeepalivePing{
+// 						KeepalivePing: &pb.KeepAlivePing{
+// 							Message: "KeepAlivePing from server",
+// 						},
+// 					},
+// 				})
+// 				if err != nil {
+// 					log.Printf("Failed to send KeepAlivePing: %v", err)
+// 					return
+// 				}
+// 				log.Println("Sent KeepAlivePing to client")
+// 			}
+// 		}
+// 	}()
+
+// 	for {
+// 		clientMsg, err := stream.Recv()
+// 		if err != nil {
+// 			log.Printf("Error receiving from client: %v", err)
+// 			return err
+// 		}
+
+// 		// Handle the oneof message from the client (either FriendList or KeepAliveAck)
+// 		switch msg := clientMsg.Message.(type) {
+
+// 		case *pb.FriendListenerRequest_FriendList:
+// 			friendList := msg.FriendList
+// 			log.Printf("Received friend list: %v", friendList.FriendIds)
+
+// 			// Send the current status of each friend to the client
+// 			for _, friendID := range friendList.FriendIds {
+// 				redisKey := "user:" + friendID
+// 				status, _ := s.redisClient.Get(ctx, redisKey).Result()
+// 				statusEnum := s.mapStatusToEnum(status)
+
+// 				err := stream.Send(&pb.FriendListenerResponse{
+// 					Message: &pb.FriendListenerResponse_FriendUpdate{
+// 						FriendUpdate: &pb.FriendUpdate{
+// 							ClientId: friendID,
+// 							Status:   statusEnum,
+// 						},
+// 					},
+// 				})
+// 				if err != nil {
+// 					log.Printf("Failed to send friend status update for %s: %v", friendID, err)
+// 				}
+
+// 				// Subscribe to changes for each friend in Redis
+// 				channel := fmt.Sprintf("status_updates:%s", friendID)
+// 				pubsub := s.redisClient.Subscribe(ctx, channel)
+
+// 				go func(friendID string) {
+// 					for msg := range pubsub.Channel() {
+// 						statusEnum := s.mapStatusToEnum(msg.Payload)
+// 						err := stream.Send(&pb.FriendListenerResponse{
+// 							Message: &pb.FriendListenerResponse_FriendUpdate{
+// 								FriendUpdate: &pb.FriendUpdate{
+// 									ClientId: friendID,
+// 									Status:   statusEnum,
+// 								},
+// 							},
+// 						})
+// 						if err != nil {
+// 							log.Printf("Failed to send friend status update for %s: %v", friendID, err)
+// 							return
+// 						}
+// 						log.Printf("Sent friend status update for %s: %v", friendID, statusEnum)
+// 					}
+// 				}(friendID)
+// 			}
+
+// 		case *pb.FriendListenerRequest_KeepaliveAck:
+// 			ack := msg.KeepaliveAck
+// 			log.Printf("Received KeepAliveAck from client: %v", ack.Message)
+
+//			default:
+//				log.Printf("Unknown message type received from client: %v", clientMsg)
+//			}
+//		}
+//	}
 func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 	ctx := stream.Context()
+
+	// Track the active friends that the server is listening to
+	activeFriends := make(map[string]struct{})
+	pubsubMap := make(map[string]*redis.PubSub) // Maps friendID to the PubSub subscription
 
 	// Start a goroutine to send periodic KeepAlivePing to the client
 	ticker := time.NewTicker(30 * time.Second) // Send every 30 seconds
@@ -203,19 +303,139 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 			return err
 		}
 
-		// Handle the oneof message from the client (either FriendList or KeepAliveAck)
+		// Handle the oneof message from the client (either AddFriendList, AddFriend, RemoveFriendList, RemoveFriend, or KeepAliveAck)
 		switch msg := clientMsg.Message.(type) {
 
-		case *pb.FriendListenerRequest_FriendList:
-			friendList := msg.FriendList
-			log.Printf("Received friend list: %v", friendList.FriendIds)
+		// Add Multiple Friends
+		case *pb.FriendListenerRequest_AddFriendList:
+			friendList := msg.AddFriendList.FriendIds
+			log.Printf("📥 Received AddFriendList: %v", friendList)
 
-			// Send the current status of each friend to the client
-			for _, friendID := range friendList.FriendIds {
-				redisKey := "user:" + friendID
-				status, _ := s.redisClient.Get(ctx, redisKey).Result()
-				statusEnum := s.mapStatusToEnum(status)
+			// Filter out friends that are already in the active list
+			var newFriends []string
+			for _, friendID := range friendList {
+				if _, exists := activeFriends[friendID]; !exists {
+					newFriends = append(newFriends, friendID)
+					activeFriends[friendID] = struct{}{}
+				}
+			}
 
+			if len(newFriends) > 0 {
+				log.Printf("📡 Listening for updates from new friends: %v", newFriends)
+				s.listenToFriendUpdates(stream, newFriends, activeFriends, pubsubMap)
+			} else {
+				log.Println("No new friends to add to the listener.")
+			}
+
+		// Add Single Friend
+		case *pb.FriendListenerRequest_AddFriend:
+			friendID := msg.AddFriend.FriendId
+			log.Printf("📥 Received AddFriend: %s", friendID)
+
+			if _, exists := activeFriends[friendID]; !exists {
+				activeFriends[friendID] = struct{}{}
+				log.Printf("📡 Listening for updates from new friend: %s", friendID)
+				s.listenToFriendUpdates(stream, []string{friendID}, activeFriends, pubsubMap)
+			} else {
+				log.Printf("Friend %s is already being tracked", friendID)
+			}
+
+		// Remove Multiple Friends
+		case *pb.FriendListenerRequest_RemoveFriendList:
+			friendList := msg.RemoveFriendList.FriendIds
+			log.Printf("📥 Received RemoveFriendList: %v", friendList)
+
+			for _, friendID := range friendList {
+				if _, exists := activeFriends[friendID]; exists {
+					delete(activeFriends, friendID)
+					if pubsub, exists := pubsubMap[friendID]; exists {
+						pubsub.Close()
+						delete(pubsubMap, friendID)
+					}
+					log.Printf("🗑️ Removed friend from active list: %s", friendID)
+				}
+			}
+
+		// Remove Single Friend
+		case *pb.FriendListenerRequest_RemoveFriend:
+			friendID := msg.RemoveFriend.FriendId
+			log.Printf("📥 Received RemoveFriend: %s", friendID)
+
+			if _, exists := activeFriends[friendID]; exists {
+				delete(activeFriends, friendID)
+				if pubsub, exists := pubsubMap[friendID]; exists {
+					pubsub.Close()
+					delete(pubsubMap, friendID)
+				}
+				log.Printf("🗑️ Removed friend from active list: %s", friendID)
+			}
+
+		// Handle KeepAlive Acknowledgment
+		case *pb.FriendListenerRequest_KeepaliveAck:
+			ack := msg.KeepaliveAck
+			log.Printf("Received KeepAliveAck from client: %v", ack.Message)
+
+		default:
+			log.Printf("Unknown message type received from client: %v", clientMsg)
+		}
+	}
+}
+
+func (s *Server) listenToFriendUpdates(
+	stream pb.Server_FriendListenerServer,
+	newFriends []string, // Renamed from friendIDs to newFriends
+	activeFriends map[string]struct{},
+	pubsubMap map[string]*redis.PubSub,
+) {
+	ctx := stream.Context()
+
+	for _, friendID := range newFriends {
+		// If the friend is already being tracked, skip them
+		if _, exists := pubsubMap[friendID]; exists {
+			log.Printf("Friend %s is already being tracked, skipping.", friendID)
+			continue
+		}
+
+		// Get the friend's current status from Redis
+		redisKey := "user:" + friendID
+		status, err := s.redisClient.Get(ctx, redisKey).Result()
+		if err != nil && err != redis.Nil {
+			log.Printf("Error retrieving status for friend %s: %v", friendID, err)
+			continue
+		}
+
+		statusEnum := s.mapStatusToEnum(status)
+		log.Printf("Initial status for friend %s: %v", friendID, statusEnum)
+
+		// Send the initial status update to the client
+		err = stream.Send(&pb.FriendListenerResponse{
+			Message: &pb.FriendListenerResponse_FriendUpdate{
+				FriendUpdate: &pb.FriendUpdate{
+					ClientId: friendID,
+					Status:   statusEnum,
+				},
+			},
+		})
+		if err != nil {
+			log.Printf("Failed to send initial status for friend %s: %v", friendID, err)
+			continue
+		}
+
+		// Subscribe to the Redis Pub/Sub channel for this friend's status updates
+		channel := fmt.Sprintf("status_updates:%s", friendID)
+		pubsub := s.redisClient.Subscribe(ctx, channel)
+
+		pubsubMap[friendID] = pubsub // Store the PubSub reference to later unsubscribe
+
+		go func(friendID string, pubsub *redis.PubSub) {
+			defer func() {
+				log.Printf("Stopped listening to updates for friend %s", friendID)
+			}()
+
+			for msg := range pubsub.Channel() {
+				statusEnum := s.mapStatusToEnum(msg.Payload)
+
+				// Send the status update back to the client
 				err := stream.Send(&pb.FriendListenerResponse{
 					Message: &pb.FriendListenerResponse_FriendUpdate{
 						FriendUpdate: &pb.FriendUpdate{
@@ -225,40 +445,18 @@ func (s *Server) FriendListener(stream pb.Server_FriendListenerServer) error {
 					},
 				})
 				if err != nil {
-					log.Printf("Failed to send friend status update for %s: %v", friendID, err)
+					log.Printf("Failed to send status update for friend %s: %v", friendID, err)
+					break // If send fails, break out of the loop
 				}
 
-				// Subscribe to changes for each friend in Redis
-				channel := fmt.Sprintf("status_updates:%s", friendID)
-				pubsub := s.redisClient.Subscribe(ctx, channel)
-
-				go func(friendID string) {
-					for msg := range pubsub.Channel() {
-						statusEnum := s.mapStatusToEnum(msg.Payload)
-						err := stream.Send(&pb.FriendListenerResponse{
-							Message: &pb.FriendListenerResponse_FriendUpdate{
-								FriendUpdate: &pb.FriendUpdate{
-									ClientId: friendID,
-									Status:   statusEnum,
-								},
-							},
-						})
-						if err != nil {
-							log.Printf("Failed to send friend status update for %s: %v", friendID, err)
-							return
-						}
-						log.Printf("Sent friend status update for %s: %v", friendID, statusEnum)
-					}
-				}(friendID)
+				log.Printf("Sent status update for friend %s: %v", friendID, statusEnum)
 			}
 
-		case *pb.FriendListenerRequest_KeepaliveAck:
-			ack := msg.KeepaliveAck
-			log.Printf("Received KeepAliveAck from client: %v", ack.Message)
-
-		default:
-			log.Printf("Unknown message type received from client: %v", clientMsg)
-		}
+			// Clean up Redis Pub/Sub subscription
+			pubsub.Close()
+			delete(pubsubMap, friendID)
+			delete(activeFriends, friendID)
+		}(friendID, pubsub)
 	}
 }
 
