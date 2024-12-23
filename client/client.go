@@ -21,13 +21,17 @@ var friendStatusMap sync.Map
 // Store the list of friend IDs
 var friendList []string
 var friendListLock sync.Mutex
+var name string
+var nameLock sync.Mutex
+var image string
+var imageLock sync.Mutex
 
 // Persistent stream for FriendListener
 var stream pb.Server_FriendListenerClient
 var streamLock sync.Mutex
 
 func main() {
-	var clientID, name, image string
+	var clientID string
 	var initialFriends []string
 
 	// Handle command line arguments for clientID, name, image, and friends list
@@ -37,8 +41,8 @@ func main() {
 
 	// Parse arguments
 	clientID = os.Args[1]
-	name = os.Args[2]
-	image = os.Args[3]
+	setName(os.Args[2])
+	setImage(os.Args[3])
 
 	// Parse optional friend IDs
 	if len(os.Args) > 4 {
@@ -226,29 +230,6 @@ func printFriendStatusTable() {
 	fmt.Println("=================================")
 }
 
-func listenForUserInput() {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("Enter command (add <friendID> / remove <friendID>): ")
-		input, _ := reader.ReadString('\n')
-		parts := strings.Fields(input)
-		if len(parts) != 2 {
-			fmt.Println("Invalid command. Use 'add <friendID>' or 'remove <friendID>'")
-			continue
-		}
-		command, friendID := parts[0], strings.TrimSpace(parts[1])
-
-		switch command {
-		case "add":
-			addFriend(friendID)
-		case "remove":
-			removeFriend(friendID)
-		default:
-			fmt.Println("Invalid command. Use 'add <friendID>' or 'remove <friendID>'")
-		}
-	}
-}
-
 func addFriend(friendID string) {
 	log.Printf("Adding friend: %s", friendID)
 	friendListLock.Lock()
@@ -309,4 +290,61 @@ func dialServer() (*grpc.ClientConn, error) {
 	}
 	log.Println("✅ Successfully connected to the gRPC server")
 	return conn, nil
+}
+
+func listenForUserInput() {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("Enter command (add <friendID> / remove <friendID> / name <newName> / image <newImage>): ")
+		input, _ := reader.ReadString('\n')
+		parts := strings.Fields(input)
+		if len(parts) < 2 {
+			fmt.Println("Invalid command. Use 'add <friendID>', 'remove <friendID>', 'name <newName>', or 'image <newImage>'")
+			continue
+		}
+
+		command := parts[0]
+		argument := strings.Join(parts[1:], " ")
+
+		switch command {
+		case "add":
+			addFriend(argument)
+		case "remove":
+			removeFriend(argument)
+		case "name":
+			setName(argument)
+		case "image":
+			setImage(argument)
+		default:
+			fmt.Println("Invalid command. Use 'add <friendID>', 'remove <friendID>', 'name <newName>', or 'image <newImage>'")
+		}
+	}
+}
+
+// Thread-safe getter and setter for `name`
+func setName(newName string) {
+	nameLock.Lock()
+	defer nameLock.Unlock()
+	name = newName
+	log.Printf("Name updated to: %s", name)
+}
+
+func getName() string {
+	nameLock.Lock()
+	defer nameLock.Unlock()
+	return name
+}
+
+// Thread-safe getter and setter for `image`
+func setImage(newImage string) {
+	imageLock.Lock()
+	defer imageLock.Unlock()
+	image = newImage
+	log.Printf("Image updated to: %s", image)
+}
+
+func getImage() string {
+	imageLock.Lock()
+	defer imageLock.Unlock()
+	return image
 }
